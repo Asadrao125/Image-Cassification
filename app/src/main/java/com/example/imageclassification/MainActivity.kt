@@ -111,13 +111,53 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 250) {
             img_view.setImageURI(data?.data)
-
             var uri: Uri? = data?.data
             bitmap = MediaStore.Images.Media.getBitmap(this.contentResolver, uri)
+
+            makePrediction()
+
         } else if (requestCode == 200 && resultCode == Activity.RESULT_OK) {
             bitmap = data?.extras?.get("data") as Bitmap
             img_view.setImageBitmap(bitmap)
+
+            makePrediction()
+
         }
+    }
+
+    fun makePrediction() {
+        // Make Prediction Code
+
+        val labels =
+            application.assets.open("labels.txt").bufferedReader().use { it.readText() }
+                .split("\n")
+
+        var resized = Bitmap.createScaledBitmap(bitmap, 224, 224, true)
+
+        resized = resized.copy(Bitmap.Config.ARGB_8888, true)
+
+        val model = MobilenetV110224Quant.newInstance(this)
+
+        var tbuffer = TensorImage.fromBitmap(resized)
+        var byteBuffer = tbuffer.buffer
+
+        // Creates inputs for reference.
+        val inputFeature0 =
+            TensorBuffer.createFixedSize(intArrayOf(1, 224, 224, 3), DataType.UINT8)
+        inputFeature0.loadBuffer(byteBuffer)
+
+        // Runs model inference and gets result.
+        val outputs = model.process(inputFeature0)
+        val outputFeature0 = outputs.outputFeature0AsTensorBuffer
+
+        var max = getMax(outputFeature0.floatArray)
+
+        text_view.setText(labels[max])
+
+        // Releases model resources if no longer used.
+        model.close()
+
+        //
     }
 
     fun getMax(arr: FloatArray): Int {
